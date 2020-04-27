@@ -1,0 +1,64 @@
+version: 2.1
+
+jobs:
+    lint-charts:
+        docker:
+            - image: alpine/helm:3.2.0
+        steps:
+            - checkout
+            - run: helm lint charts/*
+
+    package-charts:
+        docker:
+            - image: alpine/helm:3.2.0
+        steps:
+            - checkout
+            - run: helm package charts/* --destination ./build
+            - persist_to_workspace:
+                  root: ~/
+                  paths:
+                      - project/build
+
+    build-index:
+        docker:
+            - image: alpine/helm:3.2.0
+        steps:
+            - attach_workspace:
+                  at: ~/
+            - run: |
+                  cd ~/project
+                  helm repo index build --url charts.borchero.com
+            - persist_to_workspace:
+                  root: ~/
+                  paths:
+                      - project/build
+
+    publish-repository:
+        docker:
+            - image: borchero/cuckoo:0.4.1
+        steps:
+            - attach_workspace:
+                  at: ~/
+            - run: |
+                  cd ~/project
+                  cuckoo auth
+                  cuckoo publish \
+                      --dir build \
+                      --bucket charts.borchero.com \
+                      --purge \
+                      --aws-cloudfront-distribution E8EQFPONYQ9YA
+
+workflows:
+    version: 2
+    deploy-workflow:
+        jobs:
+            - lint-charts
+            - package-charts:
+                  requires:
+                      - lint-charts
+            - build-index:
+                  requires:
+                      - package-charts
+            - publish-repository:
+                  requires:
+                      - build-index
