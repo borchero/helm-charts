@@ -27,7 +27,7 @@ jobs:
                   at: ~/
             - run: |
                   cd ~/project
-                  helm repo index build --url charts.borchero.com
+                  helm repo index build --url https://charts.borchero.com
             - persist_to_workspace:
                   root: ~/
                   paths:
