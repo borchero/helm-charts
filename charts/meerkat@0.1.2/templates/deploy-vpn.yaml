@@ -1,0 +1,51 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+    name: {{ .Release.Name }}-vpn
+
+spec:
+    replicas: 1
+    strategy:
+        type: Recreate
+    selector:
+        matchLabels:
+            app.kubernetes.io/name: {{ .Release.Name }}-vpn
+
+    template:
+        metadata:
+            labels:
+                app.kubernetes.io/name: {{ .Release.Name }}-vpn
+            annotations:
+                vault.hashicorp.com/agent-inject: "true"
+                vault.hashicorp.com/role: {{ .Values.vault.roles.vpn }}
+                {{ include "vault.kv-value" (dict "root" $ "name" "dh-params") | indent 16 }}
+                {{ include "vault.kv-value" (dict "root" $ "name" "tls-auth") | indent 16 }}
+                {{ include "vault.pki-cert" (dict "root" $ "name" "certificate") | indent 16 }}
+                {{ include "vault.pki-cert" (dict "root" $ "name" "private_key") | indent 16 }}
+                {{ include "vault.pki-cert" (dict "root" $ "name" "issuing_ca") | indent 16 }}
+                vault.hashicorp.com/agent-inject-secret-crl: {{ .Values.vault.paths.pki }}/crl/pem
+
+        spec:
+            serviceAccountName: {{ .Values.vpn.serviceAccountName }}
+            containers:
+            -   name: vpn
+                image: {{ .Values.vpn.image.name }}:{{ .Values.vpn.image.tag }}
+                imagePullPolicy: {{ .Values.vpn.image.pullPolicy }}
+                command: ["openvpn", "--config", "/etc/openvpn/server.conf"]
+                securityContext:
+                    capabilities:
+                        add: ["NET_ADMIN"]
+                ports:
+                -   name: openvpn
+                    containerPort: 1194
+                    protocol: {{ .Values.vpn.service.protocol | upper }}
+                volumeMounts:
+                -   name: server-config
+                    mountPath: /etc/openvpn
+                    readOnly: true
+            volumes:
+            -   name: server-config
+                configMap:
+                    name: {{ .Release.Name }}-vpn-conf
