@@ -1,0 +1,16 @@
+{{- if .Values.rbac.create -}}
+---
+apiVersion: v1
+kind: ServiceAccount
+
+metadata:
+    name: {{ .Values.vpn.serviceAccountName }}
+
+---
+apiVersion: v1
+kind: ServiceAccount
+
+metadata:
+    name: {{ .Values.api.serviceAccountName }}
+
+{{- end -}}
